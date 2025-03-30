@@ -90,7 +90,7 @@ jobs:
            run: |
               mkdir -p ~/.config/goose
               cat <<EOF > ~/.config/goose/config.yaml
-              GOOSE_PROVIDER: OpenRouter
+              GOOSE_PROVIDER: openrouter
               GOOSE_MODEL: anthropic/claude-3.5-sonnet
               keyring: false
               EOF
