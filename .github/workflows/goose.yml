@@ -10,6 +10,7 @@ permissions:
    issues: write
 
 env:
+   GH_TOKEN: ${{ github.token }}
    PROVIDER_API_KEY: ${{ secrets.REPLACE_WITH_PROVIDER_API_KEY }}
    PR_NUMBER: ${{ github.event.pull_request.number }}
 
