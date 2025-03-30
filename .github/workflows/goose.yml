@@ -85,7 +85,21 @@ jobs:
               mkdir -p /home/runner/.local/bin
               curl -fsSL https://github.com/block/goose/releases/download/stable/download_cli.sh \
               | CONFIGURE=false INSTALL_PATH=/home/runner/.local/bin bash
-              echo "/home/runner/.local/bin" >> $GITHUB_PATH
+              echo "/home/runner/.local/bin" >> $GITHUB_PATH         - name: Install Goose CLI
+           run: |
+             mkdir -p /home/runner/.local/bin
+             # Download specific version 1.0.14 of Goose CLI
+             curl -fsSL -o goose.tar.bz2 https://github.com/block/goose/releases/download/v1.0.14/goose-x86_64-unknown-linux-gnu.tar.bz2
+             # Extract the archive
+             tar -xjf goose.tar.bz2
+             # Move the binary to the local bin directory
+             chmod +x goose
+             mv goose /home/runner/.local/bin/
+             # Add to path
+             echo "/home/runner/.local/bin" >> $GITHUB_PATH
+             # Verify installation
+             goose --version
+
 
          - name: Configure Goose
            run: |
