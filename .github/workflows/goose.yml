@@ -1,0 +1,105 @@
+name: Goose
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+env:
+  GH_TOKEN: ${{ github.token }}
+  RUST_BACKTRACE: 1
+  OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+  PR_NUMBER: ${{ github.event.pull_request.number }}
+
+jobs:
+  goose-comment:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Gather PR information
+        run: |
+          {
+          echo "# Files Changed"
+          gh pr view $PR_NUMBER --json files \
+             -q '.files[] | "* " + .path + " (" + (.additions|tostring) + " additions, " + (.deletions|tostring) + " deletions)"'
+          echo ""
+          echo "# Changes Summary"
+          gh pr diff $PR_NUMBER
+          } > changes.txt
+
+      - name: Install Goose CLI
+        run: |
+          mkdir -p /home/runner/.local/bin
+          # Download specific version 1.0.14 of Goose CLI
+          curl -fsSL -o goose.tar.bz2 https://github.com/block/goose/releases/download/v1.0.14/goose-x86_64-unknown-linux-gnu.tar.bz2
+          # Extract the archive
+          tar -xjf goose.tar.bz2
+          # Move the binary to the local bin directory
+          chmod +x goose
+          mv goose /home/runner/.local/bin/
+          # Add to path
+          echo "/home/runner/.local/bin" >> $GITHUB_PATH
+          # Verify installation
+          goose --version
+
+      - name: Configure Goose
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          mkdir -p ~/.config/goose
+          # Create configuration file with API key explicitly included
+          cat <<EOF > ~/.config/goose/config.yaml
+          GOOSE_PROVIDER: openrouter
+          GOOSE_MODEL: anthropic/claude-3.5-sonnet
+          OPENROUTER_API_KEY: $OPENROUTER_API_KEY
+          keyring: false
+          EOF
+          # For debugging - check if config file was created correctly (redact API key)
+          cat ~/.config/goose/config.yaml | grep -v API_KEY
+
+      - name: Create instructions for Goose
+        run: |
+          cat <<EOF > instructions.txt
+          Create a summary of the changes provided. Don't provide any session or logging details.
+          The summary for each file should be brief and structured as:
+          <filename/path (wrapped in backticks)>
+             - dot points of changes
+          You don't need any extensions, don't mention extensions at all.
+          The changes to summarise are:
+          $(cat changes.txt)
+          EOF
+
+      - name: Test
+        run: cat instructions.txt
+
+      - name: Run Goose and filter output
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          # Log environment status (don't show actual API key)
+          env | grep -v API_KEY | sort
+          # Run goose with API key explicitly set
+          OPENROUTER_API_KEY="$OPENROUTER_API_KEY" goose run --instructions instructions.txt | \
+          # Remove ANSI color codes
+          sed -E 's/\x1B\[[0-9;]*[mK]//g' | \
+          # Remove session/logging lines
+          grep -v "logging to /home/runner/.config/goose/sessions/" | \
+          grep -v "^starting session" | \
+          grep -v "^Closing session" | \
+          # Trim trailing whitespace
+          sed 's/[[:space:]]*$//' \
+          > pr_comment.txt
+
+      - name: Post comment to PR
+        run: |
+          cat -A pr_comment.txt
+          gh pr comment $PR_NUMBER --body-file pr_comment.txt
