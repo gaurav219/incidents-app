@@ -13,6 +13,7 @@ env:
   GH_TOKEN: ${{ github.token }}
   RUST_BACKTRACE: 1
   PROVIDER_API_KEY: ${{ secrets.REPLACE_WITH_PROVIDER_API_KEY }}
+  OPENROUTER_API_KEY: ${{ secrets.REPLACE_WITH_PROVIDER_API_KEY }}
   PR_NUMBER: ${{ github.event.pull_request.number }}
 
 # steps:
@@ -98,6 +99,8 @@ jobs:
       - name: Configure Goose
         run: |
           mkdir -p ~/.config/goose
+          # Export OPENROUTER_API_KEY for the whole session
+          export OPENROUTER_API_KEY="${{ secrets.OPENROUTER_API_KEY }}"
           cat <<EOF > ~/.config/goose/config.yaml
           GOOSE_PROVIDER: openrouter
           GOOSE_MODEL: anthropic/claude-3.5-sonnet
@@ -121,6 +124,8 @@ jobs:
 
       - name: Run Goose and filter output
         run: |
+          # Ensure OPENROUTER_API_KEY is available in this step
+          export OPENROUTER_API_KEY="${{ secrets.OPENROUTER_API_KEY }}"
           goose run --instructions instructions.txt | \
           # Remove ANSI color codes
           sed -E 's/\x1B\[[0-9;]*[mK]//g' | \
